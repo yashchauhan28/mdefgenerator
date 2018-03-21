@@ -3,6 +3,13 @@ from bs4 import BeautifulSoup
 import urllib.request
 import re
 
+def makeName(data):
+    newData = ""
+    for i in range(len(data)):
+        if (data[i]>='a' and data[i]<='z') or (data[i]<='A' and data[i]>='Z'):
+            newData += data[i]
+    return newData.title()
+
 def getSqlType(data):
     if data == "timestamp":
         return "SQL_TIMESTAMP"
@@ -26,11 +33,12 @@ def getSourceType(data):
     else:
         return "integer"
 
-def makeFirstCapital(data):
+def makeFirstCapital(data,flag=True):
     if str(data[0] == '"'):
         data = data[1:-1]
         if (data[0]>='a' and data[0]<='z') or (data[0]>='A' and data[0]<='Z'):
-            return data.title()
+            if flag:
+                return data.title()
     return data
 
 tableName = str(input())
@@ -47,7 +55,7 @@ for val in div.find_all('span' , {'class' : ['s2', 'mi' , 'n', 'p']}):
         start = True
 
 columnArray = []
-virtualTable = []
+virtualTableArray = []
 stable = 0
 i=0
 
@@ -62,17 +70,31 @@ while i<len(value):
             break
     elif value[i].text == ":":
         i+=1
-    #print (str(value[i].text) +  " " + str(value[i+1].text) + " " + str(value[i+2].text)),
     elif value[i+2].text == "[],":
         print ("Currently Empty Virtual Table")
+        virtualTable = {}
+        virtualTable['TableName'] = makeName(tableName) + "_" + makeName(value[i].text)
+        virtualTable['SvcRespAttr_ListResult'] = "data." + makeFirstCapital(value[i].text)
+        virtualTable['SvcRespAttr_ItemResult'] = "data." + makeFirstCapital(value[i].text)
+        virtualTable['PKeyColumn'] = {}
+        virtualTable['PKeyColumn']['pk_Reasons_Not_Servable'] = []
+        pkDict = {'PKColumnName' : 'Id' , 'RelatedFKColumns' : []}
+        virtualTable['PKeyColumn']['pk_Reasons_Not_Servable'].append(pkDict)
+        virtualTableArray.append(virtualTable)
         i+=3
     elif value[i+2].text == "[":
+        virtualTable = {}
+        virtualTable['TableName'] = makeName(tableName) + "_" + makeName(value[i].text)
+        virtualTable['SvcRespAttr_ListResult'] = "data." + makeFirstCapital(value[i].text,False)
+        virtualTable['SvcRespAttr_ItemResult'] = "data." + makeFirstCapital(value[i].text,False)
+        virtualTable['PKeyColumn'] = {}
+        virtualTable['PKeyColumn']['pk_Reasons_Not_Servable'] = []
+        pkDict = {'PKColumnName' : 'Id' , 'RelatedFKColumns' : []}
+        virtualTable['PKeyColumn']['pk_Reasons_Not_Servable'].append(pkDict)
+        virtualTableArray.append(virtualTable)
         i+=1
         while (value[i+2].text) != "],":
-            #print (value[i+2].text),
             i+=1
-        #print ("]"),
-        print ("some Fields in Virtual table")
         i+=3
     else:
         column = {}
@@ -88,18 +110,60 @@ while i<len(value):
             column['Metadata']['Length'] = 255
         column["Nullable"] = False
         column["Updatable"] = True
-        column["SvcRespAttr_ListResult"] = "data." + value[i].text
-        column["SvcRespAttr_ItemResult"] = "data." + value[i].text
-        column["SvcReqParam_QueryMapping"] = value[i].text
+        column["SvcRespAttr_ListResult"] = "data." + makeFirstCapital(value[i].text,False)
+        column["SvcRespAttr_ItemResult"] = "data." + makeFirstCapital(value[i].text,False)
+        column["SvcReqParam_QueryMapping"] = makeFirstCapital(value[i].text,False)
+        column['FKeyColumn'] = []
+        column['Columns'] = []
         columnArray.append(column)
-        #print ("\n")
         i+=3
 
-print ("test name " + columnArray[0]['Name'])
-fs = open('columns.txt','w')
-fs.write('{ "Columns" : [')
-for obj in columnArray:
-    #print(obj['Name'])
-    fs.write(json.dumps(obj))
-    fs.write(",")
-fs.write("]}")
+fs = open(tableName + '.txt','w')
+
+table = {}
+table['TableName'] = makeName(tableName)
+table['Sortable'] = True
+table['Pagable'] = True
+table['PKeyColumn'] = {}
+table['FKeyColumn'] = {}
+table['Parameters'] = {}
+table['Parameters']['AcceptedKeys'] = []
+table['ItemEndpointColumnNames'] = []
+table['ColumnPushdown'] = {}
+table['ColumnPushdown']['Support'] = False
+table['ColumnPushdown']['SvcReqParam_Key'] = []
+table['Columns'] = []
+for i in range(len(columnArray)):
+    table['Columns'].append(columnArray[i])
+table['VirtualTables'] = virtualTableArray
+table['APIAccess'] = {}
+
+table['APIAccess']['CreateAPI'] = {}
+table['APIAccess']['CreateAPI']['Method'] = "POST"
+table['APIAccess']['CreateAPI']['ColumnRequirements'] = []
+table['APIAccess']['CreateAPI']['Accept'] = "application/json"
+table['APIAccess']['CreateAPI']['ContentType'] = "application/json"
+table['APIAccess']['CreateAPI']['ParameterFormat'] = "Query"
+
+table['APIAccess']['ReadAPI'] = {}
+table['APIAccess']['ReadAPI']['Method'] = "GET"
+table['APIAccess']['ReadAPI']['ColumnRequirements'] = []
+table['APIAccess']['ReadAPI']['Accept'] = "application/json"
+table['APIAccess']['ReadAPI']['ContentType'] = "application/json"
+table['APIAccess']['ReadAPI']['ParameterFormat'] = "Query"
+
+table['APIAccess']['UpdateAPI'] = {}
+table['APIAccess']['UpdateAPI']['Method'] = "GET"
+table['APIAccess']['UpdateAPI']['ColumnRequirements'] = []
+table['APIAccess']['UpdateAPI']['Accept'] = "application/json"
+table['APIAccess']['UpdateAPI']['ContentType'] = "application/json"
+table['APIAccess']['UpdateAPI']['ParameterFormat'] = "Query"
+
+table['APIAccess']['DeleteAPI'] = {}
+table['APIAccess']['DeleteAPI']['Method'] = "GET"
+table['APIAccess']['DeleteAPI']['ColumnRequirements'] = []
+table['APIAccess']['DeleteAPI']['Accept'] = "application/json"
+table['APIAccess']['DeleteAPI']['ContentType'] = "application/json"
+table['APIAccess']['DeleteAPI']['ParameterFormat'] = "Query"
+
+fs.write(json.dumps(table))
