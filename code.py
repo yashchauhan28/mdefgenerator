@@ -44,12 +44,6 @@ def makeFirstCapital(data,flag=True):
 if __name__ == '__main__':
     tables = []
     tableList = []
-    # while True:
-    #     inp = str(input())
-    #     if inp != "-1":
-    #         tableList.append(inp)
-    #     else:
-    #         break
     tableList = [line.rstrip('\n') for line in open('inputs.txt')]
     for tableName in tableList:
         blocks = tableName.split(" ")
@@ -58,7 +52,7 @@ if __name__ == '__main__':
         if len(blocks) > 1:
             divId = blocks[1]
         #print(tableName,divId)
-        soup = BeautifulSoup(urllib.request.urlopen('https://developer.twitter.com/en/docs/ads/campaign-management/api-reference/' + tableName) , "html5lib")
+        soup = BeautifulSoup(urllib.request.urlopen('https://developer.twitter.com/en/docs/ads/measurement/api-reference/' + tableName) , "html5lib")
         if divId == "" :
             div = soup.find(id = tableName).find(id = "example-response")
         else :
@@ -76,7 +70,7 @@ if __name__ == '__main__':
         virtualTableArray = []
         stable = 0
         i=0
-
+        ss = set()
         while i<len(value):
             if value[i].text == ",":
                 i+=1
@@ -126,9 +120,32 @@ if __name__ == '__main__':
                 while(value[i].text!='}' and value[i].text!='},'):
                     column = {}
                     colName = parentColumnName.title() + "_" + makeFirstCapital(value[i].text)
-                    sourceType = getSourceType(value[i+2].text)
-                    sqlType = getSqlType(sourceType)
-                    passdownable = False
+                    if colName not in ss:
+                        ss.add(colName)
+                        sourceType = getSourceType(value[i+2].text)
+                        sqlType = getSqlType(sourceType)
+                        passdownable = False
+                        column['Name'] = colName
+                        column['Metadata'] = {}
+                        column['Metadata']['SourceType'] = sourceType
+                        column['Metadata']['SQLType'] = sqlType
+                        if sqlType == "SQL_VARCHAR":
+                            column['Metadata']['Length'] = 255
+                        column["Nullable"] = False
+                        column["Updatable"] = True
+                        column["SvcRespAttr_ListResult"] = "data." + parentColumnName + "." + makeFirstCapital(value[i].text,False)
+                        column["SvcRespAttr_ItemResult"] = "data." + parentColumnName + "." + makeFirstCapital(value[i].text,False)
+                        column["SvcReqParam_QueryMapping"] = makeFirstCapital(value[i].text,False)
+                        columnArray.append(column)
+                    i+=3
+            else:
+                column = {}
+                colName = makeFirstCapital(value[i].text)
+                sourceType = getSourceType(value[i+2].text)
+                sqlType = getSqlType(sourceType)
+                passdownable = False
+                if colName not in ss:
+                    ss.add(colName)
                     column['Name'] = colName
                     column['Metadata'] = {}
                     column['Metadata']['SourceType'] = sourceType
@@ -137,29 +154,10 @@ if __name__ == '__main__':
                         column['Metadata']['Length'] = 255
                     column["Nullable"] = False
                     column["Updatable"] = True
-                    column["SvcRespAttr_ListResult"] = "data." + parentColumnName + "." + makeFirstCapital(value[i].text,False)
-                    column["SvcRespAttr_ItemResult"] = "data." + parentColumnName + "." + makeFirstCapital(value[i].text,False)
+                    column["SvcRespAttr_ListResult"] = "data." + makeFirstCapital(value[i].text,False)
+                    column["SvcRespAttr_ItemResult"] = "data." + makeFirstCapital(value[i].text,False)
                     column["SvcReqParam_QueryMapping"] = makeFirstCapital(value[i].text,False)
                     columnArray.append(column)
-                    i+=3
-            else:
-                column = {}
-                colName = makeFirstCapital(value[i].text)
-                sourceType = getSourceType(value[i+2].text)
-                sqlType = getSqlType(sourceType)
-                passdownable = False
-                column['Name'] = colName
-                column['Metadata'] = {}
-                column['Metadata']['SourceType'] = sourceType
-                column['Metadata']['SQLType'] = sqlType
-                if sqlType == "SQL_VARCHAR":
-                    column['Metadata']['Length'] = 255
-                column["Nullable"] = False
-                column["Updatable"] = True
-                column["SvcRespAttr_ListResult"] = "data." + makeFirstCapital(value[i].text,False)
-                column["SvcRespAttr_ItemResult"] = "data." + makeFirstCapital(value[i].text,False)
-                column["SvcReqParam_QueryMapping"] = makeFirstCapital(value[i].text,False)
-                columnArray.append(column)
                 i+=3
 
         table = {}
@@ -207,10 +205,10 @@ if __name__ == '__main__':
         table['APIAccess']['DeleteAPI']['Accept'] = "application/json"
         table['APIAccess']['DeleteAPI']['ContentType'] = "application/json"
         table['APIAccess']['DeleteAPI']['ParameterFormat'] = "Query"
-        print ("done")
+        print (tableName + " done")
         tables.append(table)
 
-    fs = open('0002.txt','w')
+    fs = open('0006.txt','w')
     tempObj = {}
     tempObj['temp'] = tables
     fs.write(json.dumps(tempObj))
